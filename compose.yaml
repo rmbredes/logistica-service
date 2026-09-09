@@ -1,0 +1,31 @@
+services:
+
+  # Banco exclusivo do logistica-service.
+  logistica-postgres:
+    image: postgres:17
+    container_name: logistica-postgres
+
+    environment:
+      POSTGRES_DB: logisticadb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    ports:
+      # Porta do Windows 5434 direcionada para a porta
+      # padrão do PostgreSQL dentro do container.
+      - "5434:5432"
+
+    volumes:
+      # Preserva os dados quando o container for removido.
+      - logistica-postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres -d logisticadb
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  logistica-postgres-data:

@@ -1,0 +1,37 @@
+spring:
+
+  application:
+    name: logistica-service
+
+  datasource:
+    # IntelliJ usa o valor local padrão.
+    # Docker e AWS poderão substituir pela variável DB_URL.
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/logisticadb}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+
+  jpa:
+    hibernate:
+      # Suficiente para o nosso laboratório.
+      ddl-auto: update
+
+    open-in-view: false
+
+    # Ajuda a acompanhar o aprendizado pelo terminal.
+    show-sql: true
+
+server:
+  # Porta exclusiva do serviço de logística.
+  port: ${SERVER_PORT:8084}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+  endpoint:
+    health:
+      show-components: always
+      show-details: always
