@@ -21,6 +21,21 @@ spring:
     # Ajuda a acompanhar o aprendizado pelo terminal.
     show-sql: true
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Identifica o emissor autorizado dos tokens.
+          # O valor precisa ser igual ao campo "iss" do JWT.
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8085/realms/recomeco}
+
+          # Endereço onde ficam as chaves públicas do Keycloak.
+          #
+          # Informar este endereço separadamente evita que o Spring
+          # precise consultar o Keycloak durante a inicialização.
+          # Isso ajuda principalmente nos testes e no GitHub Actions.
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8085/realms/recomeco/protocol/openid-connect/certs}
+
 server:
   # Porta exclusiva do serviço de logística.
   port: ${SERVER_PORT:8084}
