@@ -11,19 +11,15 @@ services:
 
     environment:
 
-      # Comunicação com o PostgreSQL pela rede interna deste Compose.
+      # A aplicação encontra seu banco pelo nome do serviço Docker.
       DB_URL: jdbc:postgresql://logistica-postgres:5432/logisticadb
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
 
       SERVER_PORT: 8084
 
-      # O monólito conteinerizado solicita o token usando
-      # o endereço interno do Keycloak.
+      # Endereços internos do Keycloak na rede Docker.
       KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/recomeco
-
-      # Para baixar as chaves públicas, o container utiliza
-      # o endereço interno do Keycloak na rede Docker.
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/recomeco/protocol/openid-connect/certs
 
     ports:
@@ -33,11 +29,10 @@ services:
       logistica-postgres:
         condition: service_healthy
 
-    # A rede default fornece acesso ao banco.
-    # A recomeco-network fornece acesso ao Keycloak.
+    # Participa da rede privada da logística e da rede compartilhada.
     networks:
-      - default
-      - recomeco-network
+      - logistica-network
+      - recomeco-network-logistica
 
 
   # PostgreSQL exclusivo do logistica-service.
@@ -62,12 +57,25 @@ services:
       timeout: 3s
       retries: 10
 
+    # O banco participa somente da rede privada.
+    networks:
+      - logistica-network
+
 
 volumes:
+
+  # Nome físico fixo, independente do projeto Compose utilizado.
   logistica-postgres-data:
+    name: recomeco-stack-local_logistica-postgres-data
 
 
-# Rede criada pelo Compose do ProjetoSpringBoot.
 networks:
-  recomeco-network:
+
+  # Rede privada entre logistica-service e logistica-postgres.
+  logistica-network:
+
+  # Nome lógico exclusivo neste arquivo.
+  # Aponta para a rede real compartilhada recomeco-network.
+  recomeco-network-logistica:
+    name: recomeco-network
     external: true
