@@ -1,0 +1,16 @@
+# Controle de versão.
+.git
+.gitignore
+
+# Configurações das IDEs.
+.idea
+*.iml
+.vscode
+
+# Arquivos desnecessários para construir a imagem.
+HELP.md
+.DS_Store
+
+# Logs locais.
+logs
+*.log
