@@ -1,6 +1,46 @@
 services:
 
-  # Banco exclusivo do logistica-service.
+  # Aplicação Spring Boot responsável pela logística.
+  logistica-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: logistica-service:local
+    container_name: logistica-service-app
+
+    environment:
+
+      # Comunicação com o PostgreSQL pela rede interna deste Compose.
+      DB_URL: jdbc:postgresql://logistica-postgres:5432/logisticadb
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+
+      SERVER_PORT: 8084
+
+      # O monólito conteinerizado solicita o token usando
+      # o endereço interno do Keycloak.
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/recomeco
+
+      # Para baixar as chaves públicas, o container utiliza
+      # o endereço interno do Keycloak na rede Docker.
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/recomeco/protocol/openid-connect/certs
+
+    ports:
+      - "8084:8084"
+
+    depends_on:
+      logistica-postgres:
+        condition: service_healthy
+
+    # A rede default fornece acesso ao banco.
+    # A recomeco-network fornece acesso ao Keycloak.
+    networks:
+      - default
+      - recomeco-network
+
+
+  # PostgreSQL exclusivo do logistica-service.
   logistica-postgres:
     image: postgres:17
     container_name: logistica-postgres
@@ -11,12 +51,9 @@ services:
       POSTGRES_PASSWORD: postgres
 
     ports:
-      # Porta do Windows 5434 direcionada para a porta
-      # padrão do PostgreSQL dentro do container.
       - "5434:5432"
 
     volumes:
-      # Preserva os dados quando o container for removido.
       - logistica-postgres-data:/var/lib/postgresql/data
 
     healthcheck:
@@ -27,5 +64,12 @@ services:
       timeout: 3s
       retries: 10
 
+
 volumes:
   logistica-postgres-data:
+
+
+# Rede criada pelo Compose do ProjetoSpringBoot.
+networks:
+  recomeco-network:
+    external: true
