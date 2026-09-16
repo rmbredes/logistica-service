@@ -1,33 +1,49 @@
 # Pipeline de integração contínua do logistica-service.
-name: CI - Java e Docker
+name: CI - Java, Docker e Amazon ECR
 
+# Situações que iniciam automaticamente o workflow.
 on:
 
-  # Confirma novamente o projeto depois que algo entra na master.
+  # Executa ao enviar commits para a master ou para a branch de implementação.
   push:
     branches:
       - master
+      - feature/github-actions-ecr
 
-  # Valida a mudança antes do merge.
+  # Executa quando uma Pull Request apontar para a master.
   pull_request:
     branches:
       - master
 
+# Permissões concedidas ao workflow.
 permissions:
+
+  # Permite baixar o código do repositório.
   contents: read
+
+  # Permite obter um token OIDC para autenticação temporária na AWS.
+  id-token: write
+
+# Valores reutilizados nos passos do workflow.
+env:
+  AWS_REGION: sa-east-1
+  AWS_ROLE_ARN: arn:aws:iam::033649548808:role/GitHubActionsEcrRecomecoRole
+  ECR_REPOSITORY: recomeco/logistica-service
 
 jobs:
 
   build:
+
+    # Máquina Linux temporária fornecida pelo GitHub.
     runs-on: ubuntu-latest
 
     steps:
 
-      # Baixa o conteúdo do repositório.
+      # Baixa o código do logistica-service.
       - name: Baixar código
         uses: actions/checkout@v6
 
-      # Prepara o Java e reutiliza dependências Maven armazenadas em cache.
+      # Instala o Java 21 e habilita o cache das dependências Maven.
       - name: Configurar Java 21
         uses: actions/setup-java@v5
         with:
@@ -35,18 +51,54 @@ jobs:
           java-version: "21"
           cache: maven
 
-      # Libera a execução do Maven Wrapper no Linux.
+      # No Linux, o Maven Wrapper precisa ter permissão de execução.
       - name: Preparar Maven Wrapper
         run: chmod +x mvnw
 
-      # Compila, executa os testes existentes e produz o JAR.
-      #
-      # Atualmente não temos testes próprios na logística,
-      # mas verify ainda valida a compilação e o empacotamento.
+      # Compila, executa os testes e gera o arquivo JAR.
       - name: Testar e gerar pacote
         run: ./mvnw clean verify
 
-      # Confirma que o Dockerfile consegue produzir a imagem.
-      # A imagem continua temporária e não será publicada.
+      # Constrói a imagem utilizando a versão mais recente da imagem-base.
+      #
+      # github.sha identifica localmente a imagem pelo commit exato
+      # que iniciou a execução.
       - name: Construir imagem Docker
-        run: docker build --tag logistica-service:${{ github.sha }} .
+        run: docker build --pull --tag logistica-service:${{ github.sha }} .
+
+      # Os próximos passos executam somente depois de um push na master.
+      # Em uma Pull Request, o workflow apenas testa e constrói a imagem.
+      - name: Obter credenciais temporárias da AWS
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: logistica-service-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Autentica o Docker no registro privado do Amazon ECR.
+      - name: Autenticar Docker no Amazon ECR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Publica duas tags para o mesmo artefato:
+      #
+      # latest:
+      # aponta para a versão mais recente da master.
+      #
+      # sha-<commit>:
+      # permite localizar exatamente o código que produziu a imagem.
+      - name: Publicar imagem no Amazon ECR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}"
+
+          docker tag logistica-service:${COMMIT_SHA} "${IMAGE_URI}:latest"
+          docker tag logistica-service:${COMMIT_SHA} "${IMAGE_URI}:sha-${COMMIT_SHA}"
+
+          docker push "${IMAGE_URI}:latest"
+          docker push "${IMAGE_URI}:sha-${COMMIT_SHA}"
