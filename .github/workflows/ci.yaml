@@ -1,0 +1,52 @@
+# Pipeline de integração contínua do logistica-service.
+name: CI - Java e Docker
+
+on:
+
+  # Confirma novamente o projeto depois que algo entra na master.
+  push:
+    branches:
+      - master
+
+  # Valida a mudança antes do merge.
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Baixa o conteúdo do repositório.
+      - name: Baixar código
+        uses: actions/checkout@v6
+
+      # Prepara o Java e reutiliza dependências Maven armazenadas em cache.
+      - name: Configurar Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      # Libera a execução do Maven Wrapper no Linux.
+      - name: Preparar Maven Wrapper
+        run: chmod +x mvnw
+
+      # Compila, executa os testes existentes e produz o JAR.
+      #
+      # Atualmente não temos testes próprios na logística,
+      # mas verify ainda valida a compilação e o empacotamento.
+      - name: Testar e gerar pacote
+        run: ./mvnw clean verify
+
+      # Confirma que o Dockerfile consegue produzir a imagem.
+      # A imagem continua temporária e não será publicada.
+      - name: Construir imagem Docker
+        run: docker build --tag logistica-service:${{ github.sha }} .
